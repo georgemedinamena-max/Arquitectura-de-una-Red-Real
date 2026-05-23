@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b1e3d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>God Mode Taller — Arquitectura de Red</title>
+<style>
+/* ══════════════════════════════════════
+   VARIABLES
+══════════════════════════════════════ */
+:root {
+  --sky-deep:    #0b1e3d;
+  --sky-mid:     #123a6e;
+  --sky-bright:  #1a5fac;
+  --sky-pale:    #b8d8f0;
+  --neon-cyan:   #00e5ff;
+  --neon-green:  #39ff14;
+  --neon-amber:  #ffb300;
+  --neon-red:    #ff3b3b;
+  --neon-violet: #c471f5;
+  --critical:    #ff3b3b;
+  --high:        #ffb300;
+  --medium:      #f9d71c;
+  --low:         #39ff14;
+  --panel-bg:    rgba(8,24,52,0.88);
+  --panel-bg2:   rgba(18,40,80,0.80);
+  --panel-bdr:   rgba(0,229,255,0.20);
+  --input-bg:    rgba(0,20,60,0.75);
+  --text-1:      #e8f4ff;
+  --text-2:      #7fb3d3;
+  --text-lbl:    #a8c8e8;
+  /* ── System font stacks — no external requests, works offline ── */
+  --ff-disp:     'Arial Black', 'Impact', 'Franklin Gothic Heavy', sans-serif;
+  --ff-body:     -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                 'Helvetica Neue', Arial, sans-serif;
+  --ff-mono:     'Courier New', 'Lucida Console', Consolas, monospace;
+  --r:           10px;
+  --r-sm:        6px;
+  --gap:         clamp(0.75rem, 2.5vw, 1.25rem);
+  --pad:         clamp(0.85rem, 3vw, 1.75rem);
+}
+
+/* ══════════════════════════════════════
+   RESET
+══════════════════════════════════════ */
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+img,canvas,svg{max-width:100%;display:block}
+a{color:inherit}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+
+/* ══════════════════════════════════════
+   BODY — gradient background (iOS-safe: no fixed)
+══════════════════════════════════════ */
+body {
+  font-family: var(--ff-body);
+  font-size: clamp(13px,1.8vw,15px);
+  color: var(--text-1);
+  line-height: 1.65;
+  overflow-x: clip; /* clip instead of hidden — allows child scroll without blocking it */
+  min-height: 100vh;
+  background: var(--sky-deep); /* fallback */
+  background: linear-gradient(
+    170deg,
+    var(--sky-deep)   0%,
+    var(--sky-mid)    30%,
+    var(--sky-bright) 62%,
+    var(--sky-pale)   84%,
+    #ddeeff           94%,
+    #f4f8fd           100%
+  );
+  /* NO background-attachment:fixed — breaks iOS Safari */
+}
+
+/* ══════════════════════════════════════
+   SKIP LINK
+══════════════════════════════════════ */
+.skip{position:absolute;top:-100%;left:1rem;background:var(--neon-cyan);color:var(--sky-deep);
+  padding:.45rem 1rem;border-radius:0 0 4px 4px;font-family:var(--ff-mono);font-size:.75rem;
+  font-weight:700;z-index:9999;text-decoration:none}
+.skip:focus{top:0}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ══════════════════════════════════════
+   HEADER
+══════════════════════════════════════ */
+header{
+  position:sticky;top:0;z-index:200;
+  background:rgba(8,20,50,0.95);
+  /* -webkit- prefix for older Safari */
+  -webkit-backdrop-filter:blur(16px);
+  backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--panel-bdr);
+  padding:clamp(.55rem,1.8vw,1rem) var(--pad);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:.5rem;
+  box-shadow:0 2px 20px rgba(0,0,0,.5);
+}
+.hdr-brand{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
+.hdr-badge{
+  font-family:var(--ff-mono);font-size:clamp(.55rem,1.5vw,.62rem);
+  letter-spacing:.16em;text-transform:uppercase;
+  background:var(--neon-cyan);color:var(--sky-deep);
+  padding:.2rem .6rem;border-radius:3px;font-weight:700;
+  box-shadow:0 0 14px rgba(0,229,255,.4);white-space:nowrap
+}
+.hdr-title{
+  font-family:var(--ff-disp);font-size:clamp(.8rem,2.5vw,1rem);
+  font-weight:600;color:var(--text-1);letter-spacing:.03em
+}
+.hdr-meta{
+  display:flex;align-items:center;gap:.65rem;
+  font-family:var(--ff-mono);font-size:clamp(.55rem,1.4vw,.65rem);color:var(--text-2)
+}
+.pulse{width:7px;height:7px;background:var(--neon-green);border-radius:50%;
+  box-shadow:0 0 10px rgba(57,255,20,.5);animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+@media(max-width:420px){.hdr-title{display:none}}
+
+/* ══════════════════════════════════════
+   MAIN — CSS GRID (mobile-first)
+══════════════════════════════════════ */
+main{
+  position:relative;z-index:1;
+  display:grid;
+  grid-template-columns:1fr; /* mobile: single column */
+  gap:var(--gap);
+  max-width:1600px;margin:0 auto;
+  padding:var(--gap) var(--gap) calc(var(--gap)*2);
+}
+
+/* Tablet + Desktop: aside column on right */
+@media(min-width:768px){
+  main{
+    grid-template-columns:1fr 240px;
+    grid-template-areas:
+      "hero      aside"
+      "diagram   aside"
+      "twocols   aside"
+      "protos    aside"
+      "security  aside";
+  }
+  .s-hero     {grid-area:hero}
+  .s-diagram  {grid-area:diagram}
+  .s-twocols  {grid-area:twocols}
+  .s-protos   {grid-area:protos}
+  .s-security {grid-area:security}
+  aside       {grid-area:aside}
+}
+@media(min-width:1100px){
+  main{grid-template-columns:1fr 280px}
+}
+
+/* ══════════════════════════════════════
+   PANEL (shared card)
+══════════════════════════════════════ */
+.panel{
+  background:var(--panel-bg);
+  border:1px solid var(--panel-bdr);
+  border-radius:var(--r);
+  box-shadow:0 8px 30px rgba(0,0,0,.45),0 0 0 1px var(--panel-bdr),inset 0 1px 0 rgba(255,255,255,.05);
+  -webkit-backdrop-filter:blur(10px);
+  backdrop-filter:blur(10px);
+  overflow:hidden;
+}
+.panel-hdr{
+  display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;
+  padding:clamp(.55rem,2vw,.85rem) var(--pad);
+  border-bottom:1px solid var(--panel-bdr);
+  background:var(--panel-bg2);
+}
+.panel-num{
+  font-family:var(--ff-mono);font-size:.6rem;
+  background:var(--neon-cyan);color:var(--sky-deep);
+  padding:.18rem .45rem;border-radius:3px;font-weight:700;
+  letter-spacing:.1em;white-space:nowrap
+}
+.panel-title{
+  font-family:var(--ff-disp);font-weight:600;
+  font-size:clamp(.95rem,3vw,1.3rem);color:var(--text-1);
+  letter-spacing:.02em;flex:1
+}
+.panel-body{padding:var(--pad)}
+
+/* ══════════════════════════════════════
+   HERO
+══════════════════════════════════════ */
+.hero-eyebrow{
+  font-family:var(--ff-mono);font-size:clamp(.58rem,1.5vw,.65rem);
+  color:var(--neon-cyan);letter-spacing:.2em;text-transform:uppercase;
+  display:flex;align-items:center;gap:.55rem;margin-bottom:1rem
+}
+.hero-eyebrow::before{content:'';display:inline-block;width:1.2rem;height:1px;
+  background:var(--neon-cyan);box-shadow:0 0 8px var(--neon-cyan);flex-shrink:0}
+.hero-h1{
+  font-family:var(--ff-disp);font-size:clamp(1.7rem,6vw,3.5rem);
+  font-weight:700;line-height:1.08;margin-bottom:1rem;letter-spacing:-.01em;
+  background:linear-gradient(100deg,#fff 0%,var(--neon-cyan) 55%,var(--sky-pale) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text
+}
+.hero-sub{
+  font-size:clamp(.8rem,2vw,.95rem);color:var(--text-2);max-width:52rem;line-height:1.7
+}
+.hero-tags{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:1rem}
+.hero-tag{
+  font-family:var(--ff-mono);font-size:clamp(.58rem,1.4vw,.62rem);
+  color:var(--neon-amber);border:1px solid rgba(255,179,0,.28);
+  background:rgba(255,179,0,.06);padding:.22rem .6rem;border-radius:4px;white-space:nowrap
+}
+
+/* ══════════════════════════════════════
+   ASIDE
+══════════════════════════════════════ */
+aside{
+  display:flex;flex-direction:column;gap:.75rem;
+}
+@media(min-width:768px){
+  /* Sticky column that moves with the page — no internal scroll trap,
+     content always fully visible, user scrolls the page naturally */
+  aside{
+    position:sticky;
+    top:calc(56px + var(--gap));
+    align-self:start;   /* shrink-wrap to content height, don't stretch */
+    overflow:visible;
+  }
+}
+
+.a-panel{
+  background:var(--panel-bg);border:1px solid var(--panel-bdr);
+  border-radius:var(--r-sm);box-shadow:0 4px 18px rgba(0,0,0,.4);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  /* overflow:visible so content is never clipped */
+  overflow:visible
+}
+.a-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.55rem var(--pad);background:var(--panel-bg2);
+  border-bottom:1px solid var(--panel-bdr);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  user-select:none;gap:.5rem
+}
+.a-hdr-title{
+  font-family:var(--ff-mono);font-size:clamp(.58rem,1.4vw,.62rem);
+  letter-spacing:.1em;text-transform:uppercase;color:var(--neon-cyan);
+  display:flex;align-items:center;gap:.4rem
+}
+.a-arrow{font-size:.65rem;color:var(--text-2);transition:transform .3s ease;flex-shrink:0}
+.a-group.collapsed .a-arrow{transform:rotate(-90deg)}
+.a-body{
+  padding:var(--pad);display:flex;flex-direction:column;gap:.6rem;
+  /* No max-height — content always fully visible */
+  max-height:2000px;  /* large enough to never clip; collapse animates to 0 */
+  overflow:visible;
+  transition:max-height .4s ease,padding .3s ease,opacity .3s ease;opacity:1
+}
+.a-group.collapsed .a-body{max-height:0;padding-top:0;padding-bottom:0;opacity:0;overflow:hidden}
+
+/* Controls */
+.ctrl{display:flex;flex-direction:column;gap:.22rem}
+label{
+  font-family:var(--ff-mono);font-size:.58rem;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--text-lbl);
+  display:block
+}
+input[type="range"]{
+  width:100%;-webkit-appearance:none;appearance:none;
+  height:4px;background:rgba(0,229,255,.15);border-radius:2px;
+  accent-color:var(--neon-cyan);cursor:pointer;outline:none
+}
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;
+  background:var(--neon-cyan);border-radius:50%;cursor:pointer;
+  box-shadow:0 0 6px rgba(0,229,255,.5)
+}
+input[type="number"],select{
+  width:100%;background:var(--input-bg);border:1px solid var(--panel-bdr);
+  border-radius:var(--r-sm);color:var(--text-1);font-family:var(--ff-mono);
+  font-size:.7rem;padding:.28rem .5rem;outline:none;
+  -webkit-appearance:none;appearance:none;
+  transition:border-color .2s
+}
+input[type="number"]:focus,select:focus{
+  border-color:var(--neon-cyan);
+  box-shadow:0 0 0 2px rgba(0,229,255,.15)
+}
+.ctrl-val{font-family:var(--ff-mono);font-size:.6rem;color:var(--neon-cyan);text-align:right}
+
+.chk-row{display:flex;align-items:center;gap:.45rem;cursor:pointer}
+.chk-row input[type="checkbox"]{
+  width:14px;height:14px;accent-color:var(--neon-cyan);cursor:pointer;flex-shrink:0
+}
+.chk-row span{font-family:var(--ff-mono);font-size:.6rem;letter-spacing:.06em;color:var(--text-lbl)}
+
+.result-box{
+  background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.2);
+  border-radius:var(--r-sm);padding:.5rem .65rem;
+  font-family:var(--ff-mono);font-size:.62rem;line-height:1.8
+}
+.r-lbl{color:var(--text-2)}
+.r-val{color:var(--neon-cyan);font-weight:700;float:right}
+.r-warn{color:var(--neon-amber)}
+.r-good{color:var(--neon-green)}
+
+.btn-calc{
+  width:100%;padding:.45rem;
+  background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.32);
+  border-radius:var(--r-sm);color:var(--neon-cyan);
+  font-family:var(--ff-mono);font-size:.62rem;letter-spacing:.1em;
+  text-transform:uppercase;cursor:pointer;
+  transition:background .2s,box-shadow .2s;
+  -webkit-tap-highlight-color:transparent
+}
+.btn-calc:hover,.btn-calc:focus{
+  background:rgba(0,229,255,.2);
+  box-shadow:0 0 14px rgba(0,229,255,.3);outline:none
+}
+
+.filter-grp{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.25rem}
+.fbtn{
+  display:inline-flex;align-items:center;
+  padding:.28rem .55rem;border-radius:4px;
+  border:1px solid var(--panel-bdr);background:rgba(0,0,0,.2);
+  color:var(--text-2);font-family:var(--ff-mono);font-size:.55rem;
+  letter-spacing:.06em;cursor:pointer;transition:all .2s;
+  -webkit-tap-highlight-color:transparent
+}
+.fbtn.active,.fbtn:focus{
+  border-color:var(--neon-cyan);color:var(--neon-cyan);
+  background:rgba(0,229,255,.1);outline:none
+}
+
+/* ══════════════════════════════════════
+   CANVAS DIAGRAM
+══════════════════════════════════════ */
+.canvas-wrap{
+  position:relative;width:100%;
+  aspect-ratio:16/7;
+  min-height:240px;border-radius:var(--r-sm);overflow:hidden;
+  background:radial-gradient(ellipse 70% 55% at 50% 40%,rgba(26,95,172,.2) 0%,transparent 70%)
+}
+/* On mobile vertical give more height so node labels have room */
+@media(max-width:600px) and (orientation:portrait){
+  .canvas-wrap{ aspect-ratio:4/3; min-height:280px; }
+}
+/* Fallback for older Safari that doesn't support aspect-ratio */
+@supports not (aspect-ratio:16/7){
+  .canvas-wrap{padding-top:43.75%;height:0;position:relative}
+  .canvas-wrap canvas{position:absolute;inset:0;width:100%;height:100%}
+}
+#dCvs{width:100%;height:100%;display:block;-webkit-tap-highlight-color:transparent}
+
+.cv-legend{
+  display:flex;flex-wrap:wrap;gap:.55rem;
+  padding:.65rem var(--pad);border-top:1px solid var(--panel-bdr);
+  background:var(--panel-bg2)
+}
+.leg-item{
+  display:flex;align-items:center;gap:.3rem;
+  font-family:var(--ff-mono);font-size:clamp(.5rem,1.2vw,.6rem);
+  color:var(--text-2);white-space:nowrap
+}
+.leg-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+/* ══════════════════════════════════════
+   TWO-COLUMN (components + calcs)
+   Mobile-first: single column
+   ≥700px: two columns
+══════════════════════════════════════ */
+.two-grid{
+  display:grid;grid-template-columns:1fr;gap:var(--gap)
+}
+@media(min-width:700px){
+  .two-grid{grid-template-columns:1fr 1fr}
+}
+
+/* Component cards */
+.comp-grid{display:grid;grid-template-columns:1fr;gap:.55rem}
+.comp-grid{grid-template-columns:1fr 1fr !important}
+@media(max-width:320px){.comp-grid{grid-template-columns:1fr !important}}
+
+.c-card{
+  background:var(--panel-bg2);border:1px solid var(--panel-bdr);
+  border-radius:var(--r-sm);padding:.85rem;
+  transition:border-color .25s,box-shadow .25s,transform .2s,opacity .3s;
+  -webkit-tap-highlight-color:transparent
+}
+.c-card:hover,.c-card:focus-within{
+  border-color:rgba(0,229,255,.38);
+  box-shadow:0 4px 18px rgba(0,0,0,.4),0 0 18px rgba(0,229,255,.1);
+  transform:translateY(-2px)
+}
+.c-icon{font-size:1.1rem;margin-bottom:.35rem}
+.c-type{font-family:var(--ff-mono);font-size:.52rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text-2);margin-bottom:.18rem}
+.c-name{font-family:var(--ff-disp);font-size:.88rem;font-weight:600;
+  color:var(--text-1);margin-bottom:.3rem;line-height:1.2}
+.c-desc{font-size:.72rem;color:var(--text-2);line-height:1.5;margin-bottom:.45rem}
+.c-stat{font-family:var(--ff-mono);font-size:.58rem;color:var(--neon-cyan);
+  background:rgba(0,229,255,.08);padding:.15rem .4rem;border-radius:3px;
+  border:1px solid rgba(0,229,255,.15);display:inline-block}
+
+/* Calc cards */
+.calc-grid{display:grid;grid-template-columns:1fr;gap:.55rem}
+
+.calc-card{
+  background:var(--panel-bg2);border:1px solid var(--panel-bdr);
+  border-radius:var(--r-sm);padding:.85rem;
+  box-shadow:0 4px 16px rgba(0,0,0,.35)
+}
+.calc-title{
+  font-family:var(--ff-mono);font-size:.6rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--neon-cyan);margin-bottom:.6rem
+}
+.formula{
+  background:rgba(0,0,0,.35);border:1px solid rgba(0,229,255,.12);
+  border-radius:var(--r-sm);padding:.6rem .7rem;
+  font-family:var(--ff-mono);font-size:clamp(.6rem,1.5vw,.7rem);
+  line-height:1.9;overflow-x:auto;-webkit-overflow-scrolling:touch
+}
+.fv{color:#c471f5}.fe{color:var(--text-2);margin:0 .3rem}
+.fval{color:var(--neon-cyan);font-weight:700}
+.fnote{color:var(--text-2);font-size:.56rem}
+.fres{border-top:1px solid rgba(0,229,255,.15);margin-top:.45rem;
+  padding-top:.45rem;color:var(--neon-amber);font-weight:700}
+
+/* Latency bars */
+.lat-row{display:flex;align-items:center;gap:.45rem;margin-bottom:.42rem;
+  font-family:var(--ff-mono);font-size:clamp(.52rem,1.3vw,.62rem)}
+.lat-lbl{width:clamp(65px,15vw,105px);color:var(--text-2);flex-shrink:0}
+.lat-trk{flex:1;height:5px;background:rgba(255,255,255,.07);
+  border-radius:3px;overflow:hidden;min-width:20px}
+.lat-fill{height:100%;border-radius:3px;animation:growBar 1.2s cubic-bezier(.4,0,.2,1) both}
+@keyframes growBar{from{width:0}}
+.lat-val{width:52px;text-align:right;color:var(--text-1);flex-shrink:0}
+
+/* Throughput bars */
+.tp-grid-v{display:grid;grid-template-columns:repeat(5,1fr);gap:.35rem;
+  align-items:end;height:clamp(80px,15vw,130px);
+  border-bottom:1px solid var(--panel-bdr);padding-bottom:.45rem;margin-bottom:.45rem}
+.tp-col{display:flex;flex-direction:column;align-items:center;gap:.28rem}
+.tp-bw{flex:1;width:100%;display:flex;align-items:flex-end;justify-content:center}
+.tp-b{width:65%;border-radius:3px 3px 0 0;animation:growUp 1.2s cubic-bezier(.4,0,.2,1) both;
+  min-width:5px;transition:opacity .2s}
+.tp-b:hover{opacity:.75}
+@keyframes growUp{from{height:0!important}}
+.tp-lbl{font-family:var(--ff-mono);font-size:clamp(.44rem,1.1vw,.55rem);
+  color:var(--text-2);text-align:center;line-height:1.25}
+
+/* ══════════════════════════════════════
+   PROTOCOLS SECTION
+   Mobile: flow list full width, table scrollable
+   Desktop: side by side
+══════════════════════════════════════ */
+.proto-inner{
+  display:grid;grid-template-columns:1fr;gap:var(--gap)
+}
+/* Side by side from 500px */
+@media(min-width:500px){
+  .proto-inner{grid-template-columns:1fr 1fr}
+}
+
+/* Flow list tighter on small screens */
+@media(max-width:499px){
+  .flow-item{padding:.55rem .7rem}
+  .flow-name{font-size:.8rem}
+  .flow-desc{font-size:.68rem}
+}
+
+/* Flow list */
+.flow-list{
+  position:relative;padding-left:clamp(1.4rem,4vw,2rem);
+  display:flex;flex-direction:column;gap:.75rem;list-style:none
+}
+.flow-list::before{
+  content:'';position:absolute;
+  left:clamp(.5rem,1.4vw,.65rem);
+  top:.7rem;bottom:.7rem;width:1.5px;
+  background:linear-gradient(to bottom,var(--neon-cyan),var(--neon-violet));
+  border-radius:1px
+}
+.flow-item{
+  position:relative;background:var(--panel-bg2);
+  border:1px solid var(--panel-bdr);border-radius:var(--r-sm);
+  padding:.7rem .85rem;transition:border-color .2s
+}
+.flow-item:hover{border-color:rgba(0,229,255,.35)}
+.flow-item::before{
+  content:attr(data-n);position:absolute;
+  left:clamp(-1.5rem,-3.8vw,-1.75rem);
+  top:50%;transform:translateY(-50%);
+  width:1.2rem;height:1.2rem;
+  background:var(--neon-cyan);color:var(--sky-deep);
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:var(--ff-mono);font-size:.55rem;font-weight:700
+}
+.flow-top{display:flex;justify-content:space-between;
+  align-items:flex-start;gap:.4rem;flex-wrap:wrap;margin-bottom:.15rem}
+.flow-name{font-family:var(--ff-disp);font-size:.88rem;
+  font-weight:600;color:var(--text-1)}
+.flow-time{font-family:var(--ff-mono);font-size:.56rem;
+  color:var(--neon-amber);margin-top:.1rem}
+.flow-desc{font-size:.72rem;color:var(--text-2);line-height:1.5}
+
+/* Protocol table */
+/* ─── TABLE: always card layout on mobile ─── */
+.tbl-scroll{border-radius:var(--r-sm);overflow:visible}
+
+/* MOBILE FIRST — card layout, zero overflow */
+table{width:100%;border-collapse:collapse;font-size:clamp(.68rem,2vw,.8rem)}
+table,thead,tbody,tr,th,td{display:block;width:100%}
+thead tr{display:none} /* hide header row — labels come from data-lbl */
+tbody tr{
+  background:var(--panel-bg2);border:1px solid var(--panel-bdr);
+  border-radius:var(--r-sm);margin-bottom:.6rem;padding:.6rem .75rem;
+  width:100%;box-sizing:border-box
+}
+tbody tr:last-child{margin-bottom:0}
+tbody td{
+  display:flex;align-items:flex-start;gap:.5rem;
+  padding:.25rem 0;border:none;line-height:1.5;
+  color:var(--text-2);word-break:break-word;overflow-wrap:anywhere;
+  width:100%;box-sizing:border-box
+}
+tbody td::before{
+  content:attr(data-lbl);
+  font-family:var(--ff-mono);font-size:.52rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--neon-cyan);
+  min-width:4.8rem;max-width:4.8rem;flex-shrink:0;padding-top:.1rem;
+  line-height:1.4
+}
+/* Separator between rows on hover */
+tbody tr:hover{border-color:rgba(0,229,255,.35);background:rgba(18,40,80,.95)}
+
+/* TABLET+ — restore real table */
+@media(min-width:600px){
+  .tbl-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{display:table;table-layout:auto;min-width:0;font-size:clamp(.7rem,1.5vw,.8rem)}
+  thead{display:table-header-group}
+  thead tr{display:table-row}
+  tbody{display:table-row-group}
+  tbody tr{display:table-row;background:transparent;border:none;
+    border-radius:0;margin:0;padding:0}
+  tbody tr:hover td{background:rgba(0,229,255,.04)}
+  tbody td{display:table-cell;padding:.65rem .75rem;
+    border-bottom:1px solid rgba(255,255,255,.05);
+    vertical-align:top;width:auto}
+  tbody td::before{display:none}
+  tbody tr:last-child td{border-bottom:none}
+  thead th{display:table-cell;background:var(--panel-bg2);font-family:var(--ff-mono);
+    font-size:.56rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-2);
+    text-align:left;padding:.6rem .75rem;border-bottom:1px solid var(--panel-bdr);
+    white-space:nowrap}
+}
+
+.ptag{display:inline-block;font-family:var(--ff-mono);font-size:.55rem;
+  font-weight:700;padding:.14rem .38rem;border-radius:3px;
+  letter-spacing:.04em;white-space:nowrap}
+.pt-c{background:rgba(0,229,255,.12);color:var(--neon-cyan);border:1px solid rgba(0,229,255,.25)}
+.pt-v{background:rgba(196,113,245,.1);color:var(--neon-violet);border:1px solid rgba(196,113,245,.25)}
+.pt-a{background:rgba(255,179,0,.1);color:var(--neon-amber);border:1px solid rgba(255,179,0,.25)}
+.pt-g{background:rgba(57,255,20,.08);color:var(--neon-green);border:1px solid rgba(57,255,20,.22)}
+.pt-r{background:rgba(255,59,59,.1);color:var(--neon-red);border:1px solid rgba(255,59,59,.25)}
+
+/* ══════════════════════════════════════
+   SECURITY
+══════════════════════════════════════ */
+.sec-grid{
+  display:grid;
+  /* 2 columns from 360px — side by side on all phones */
+  grid-template-columns:1fr 1fr;
+  gap:.6rem
+}
+@media(max-width:359px){
+  .sec-grid{grid-template-columns:1fr}
+}
+@media(min-width:900px){
+  .sec-grid{grid-template-columns:repeat(4,1fr)}
+}
+.sec-card{
+  background:var(--panel-bg2);border:1px solid var(--panel-bdr);
+  border-radius:var(--r-sm);padding:.85rem;
+  position:relative;overflow:hidden;
+  transition:transform .2s,border-color .2s;
+  -webkit-tap-highlight-color:transparent
+}
+.sec-card:hover,.sec-card:focus{transform:translateY(-2px);
+  border-color:rgba(0,229,255,.3);outline:none}
+.sec-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px}
+.sc-crit::before{background:var(--critical);box-shadow:0 0 8px var(--critical)}
+.sc-high::before{background:var(--high);box-shadow:0 0 8px var(--high)}
+.sc-med::before {background:var(--medium);box-shadow:0 0 6px var(--medium)}
+.sc-low::before {background:var(--low);box-shadow:0 0 6px var(--low)}
+.sec-lvl{font-family:var(--ff-mono);font-size:.56rem;letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:.45rem}
+.sc-crit .sec-lvl{color:var(--critical)}.sc-high .sec-lvl{color:var(--high)}
+.sc-med .sec-lvl {color:var(--medium)} .sc-low .sec-lvl {color:var(--low)}
+.sec-card h3{font-family:var(--ff-disp);font-size:.9rem;font-weight:600;
+  color:var(--text-1);margin-bottom:.45rem}
+.sec-ul{list-style:none}
+.sec-ul li{font-size:clamp(.6rem,1.8vw,.7rem);color:var(--text-2);
+  padding:.18rem 0 .18rem .75rem;position:relative;line-height:1.38}
+.sec-ul li::before{content:'›';position:absolute;left:0;color:var(--neon-cyan)}
+/* On very small screens in 2-col, reduce sec-card padding */
+@media(max-width:420px){
+  .sec-card{padding:.6rem .55rem}
+  .sec-card h3{font-size:.78rem;margin-bottom:.35rem}
+  .sec-lvl{font-size:.5rem}
+}
+
+.osi-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.5rem;margin-top:1.25rem
+}
+@media(min-width:600px){
+  .osi-grid{grid-template-columns:repeat(3,1fr)}
+}
+@media(min-width:900px){
+  .osi-grid{grid-template-columns:repeat(6,1fr)}
+}
+.osi-item{background:rgba(0,0,0,.25);border-radius:var(--r-sm);padding:.6rem .7rem}
+.osi-lbl{font-family:var(--ff-mono);font-size:.52rem;color:var(--text-2);
+  margin-bottom:.22rem;letter-spacing:.05em;text-transform:uppercase}
+.osi-val{font-size:.7rem;color:var(--text-1)}
+
+/* ══════════════════════════════════════
+   INFO BOX
+══════════════════════════════════════ */
+.info-box{
+  background:rgba(196,113,245,.07);border:1px solid rgba(196,113,245,.22);
+  border-radius:var(--r-sm);padding:.7rem .85rem;margin:.85rem 0;
+  font-size:clamp(.72rem,1.6vw,.82rem);line-height:1.65;color:var(--text-1)
+}
+.info-box strong{display:block;font-family:var(--ff-mono);font-size:.56rem;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--neon-violet);
+  margin-bottom:.28rem}
+
+code{font-family:var(--ff-mono);font-size:.8em;
+  background:rgba(0,229,255,.09);color:var(--neon-cyan);
+  padding:.06em .3em;border-radius:3px;word-break:break-all}
+
+/* ══════════════════════════════════════
+   FOOTER
+══════════════════════════════════════ */
+footer{
+  position:relative;z-index:1;
+  background:rgba(5,15,38,.95);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  border-top:1px solid var(--panel-bdr);
+  padding:var(--pad) var(--pad) calc(var(--pad)*.75);
+}
+.foot-grid{
+  display:grid;grid-template-columns:1fr;gap:var(--gap);
+  max-width:1600px;margin:0 auto clamp(.75rem,2vw,1rem);
+}
+@media(min-width:600px){.foot-grid{grid-template-columns:1fr 1fr}}
+@media(min-width:1000px){.foot-grid{grid-template-columns:repeat(4,1fr)}}
+
+.foot-col-title{
+  font-family:var(--ff-disp);font-size:.92rem;font-weight:600;
+  color:var(--neon-cyan);margin-bottom:.65rem;
+  display:flex;align-items:center;gap:.38rem
+}
+.foot-col-title::before{content:'';display:inline-block;width:.8rem;height:1px;
+  background:var(--neon-cyan);box-shadow:0 0 6px var(--neon-cyan);flex-shrink:0}
+
+.foot-concept{font-size:.72rem;color:var(--text-2);line-height:1.6;margin-bottom:.45rem}
+.foot-concept strong{color:var(--text-1);font-family:var(--ff-mono);font-size:.65rem}
+
+.foot-links{display:flex;flex-direction:column;gap:.38rem;margin-top:.4rem}
+.foot-link{
+  display:inline-flex;align-items:center;gap:.35rem;
+  color:var(--neon-cyan);text-decoration:none;
+  font-family:var(--ff-mono);font-size:.62rem;
+  transition:color .2s,text-shadow .2s;
+  -webkit-tap-highlight-color:transparent
+}
+.foot-link::before{content:'→';font-size:.65rem;transition:transform .2s}
+.foot-link:hover{color:var(--sky-pale);text-shadow:0 0 12px rgba(0,229,255,.4)}
+.foot-link:hover::before{transform:translateX(3px)}
+.foot-link:focus{outline:2px solid var(--neon-cyan);outline-offset:3px;border-radius:2px}
+
+.foot-bottom{
+  max-width:1600px;margin:0 auto;
+  padding-top:clamp(.55rem,1.5vw,.75rem);
+  border-top:1px solid rgba(255,255,255,.06);
+  display:flex;justify-content:space-between;align-items:center;
+  flex-wrap:wrap;gap:.4rem;
+  font-family:var(--ff-mono);font-size:clamp(.52rem,1.2vw,.6rem);color:var(--text-2)
+}
+
+/* ══════════════════════════════════════
+   SCROLLBAR (cosmetic, desktop only)
+══════════════════════════════════════ */
+@media(min-width:768px){
+  ::-webkit-scrollbar{width:5px;height:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--panel-bdr);border-radius:3px}
+}
+</style>
+</head>
+<body>
+
+<a href="#main-content" class="skip">Saltar al contenido</a>
+
+<!-- ══════════════════════════════
+     HEADER
+══════════════════════════════ -->
+<header role="banner">
+  <div class="hdr-brand">
+    <span class="hdr-badge">God Mode Taller</span>
+    <span class="hdr-title">Arquitectura de Red: Streaming Global</span>
+  </div>
+  <div class="hdr-meta">
+    <span class="pulse" aria-hidden="true"></span>
+    <span>SISTEMA ACTIVO</span>
+    <span aria-hidden="true">·</span>
+    <span>L99</span>
+  </div>
+</header>
+
+<!-- ══════════════════════════════
+     MAIN
+══════════════════════════════ -->
+<main id="main-content" role="main">
+
+  <!-- HERO -->
+  <section class="s-hero panel" aria-labelledby="h-hero">
+    <div class="panel-body">
+      <div class="hero-eyebrow" aria-hidden="true">Análisis de escenario real · Redes de computadoras</div>
+      <h1 class="hero-h1" id="h-hero">Servicio de Streaming<br>a Escala Global</h1>
+      <p class="hero-sub">Análisis completo de la infraestructura de red de un servicio tipo Netflix: identificación de componentes, cálculo de retardos y throughput, protocolos de aplicación y medidas de seguridad por capa OSI.</p>
+      <div class="hero-tags" aria-label="Datos del escenario">
+        <span class="hero-tag">⬡ 238 M suscriptores</span>
+        <span class="hero-tag">⬡ 15% tráfico global</span>
+        <span class="hero-tag">⬡ 125+ países</span>
+        <span class="hero-tag">⬡ +1.000 CDN PoPs</span>
+        <span class="hero-tag">⬡ 640 Tbps hora pico</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DIAGRAM 3D -->
+  <section class="s-diagram panel" aria-labelledby="h-diagram">
+    <div class="panel-hdr">
+      <span class="panel-num" aria-hidden="true">01</span>
+      <h2 class="panel-title" id="h-diagram">Topología de Red — Visualización 3D</h2>
+      <span style="font-family:var(--ff-mono);font-size:.6rem;color:var(--neon-amber);" aria-label="Animación en tiempo real">▶ LIVE</span>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-left:auto;flex-wrap:wrap;" aria-label="Controles rápidos del diagrama">
+        <label for="q-speed" style="font-family:var(--ff-mono);font-size:.55rem;color:var(--text-2);white-space:nowrap">Velocidad:</label>
+        <input type="range" id="q-speed" min="0.5" max="4" step="0.5" value="1.5" style="width:80px;accent-color:var(--neon-cyan);"
+          oninput="setSpd(this.value);document.getElementById('a-speed').value=this.value;" aria-label="Velocidad del flujo de animación">
+        <span id="q-sp-v" style="font-family:var(--ff-mono);font-size:.55rem;color:var(--neon-cyan);min-width:2rem">1.5×</span>
+        <label for="q-angle" style="font-family:var(--ff-mono);font-size:.55rem;color:var(--text-2);white-space:nowrap">Ángulo:</label>
+        <input type="range" id="q-angle" min="0" max="40" step="2" value="18" style="width:70px;accent-color:var(--neon-cyan);"
+          oninput="setAng(this.value);document.getElementById('a-angle').value=this.value;" aria-label="Ángulo de vista 3D">
+        <span id="q-ang-v" style="font-family:var(--ff-mono);font-size:.55rem;color:var(--neon-cyan);min-width:2rem">18°</span>
+      </div>
+    </div>
+    <div style="padding:0">
+      <div class="canvas-wrap" role="img" aria-label="Diagrama animado 3D de la arquitectura: cliente, ISP, CDN, Core/IXP y servidores de origen con flujo de paquetes en tiempo real">
+        <canvas id="dCvs" aria-hidden="true"></canvas>
+      </div>
+      <nav class="cv-legend" aria-label="Leyenda del diagrama">
+        <div class="leg-item"><span class="leg-dot" style="background:#00e5ff;box-shadow:0 0 7px #00e5ff"></span>Cliente</div>
+        <div class="leg-item"><span class="leg-dot" style="background:#c471f5;box-shadow:0 0 7px #c471f5"></span>ISP</div>
+        <div class="leg-item"><span class="leg-dot" style="background:#ff6b35;box-shadow:0 0 7px #ff6b35"></span>CDN</div>
+        <div class="leg-item"><span class="leg-dot" style="background:#f9d71c;box-shadow:0 0 7px #f9d71c"></span>Core/BGP</div>
+        <div class="leg-item"><span class="leg-dot" style="background:#39ff14;box-shadow:0 0 7px #39ff14"></span>Origen</div>
+        <div class="leg-item" aria-hidden="true">
+          <span style="width:16px;height:4px;background:rgba(0,229,255,.45);border-radius:2px;flex-shrink:0"></span>
+          Flujo de datos
+        </div>
+      </nav>
+    </div>
+  </section>
+
+  <!-- TWO COLUMNS: Components + Calcs -->
+  <section class="s-twocols" aria-labelledby="h-twocols">
+    <h2 id="h-twocols" class="sr-only">Componentes de Red y Cálculos de Rendimiento</h2>
+    <div class="two-grid">
+
+      <!-- Components -->
+      <div class="panel" aria-labelledby="h-comp">
+        <div class="panel-hdr">
+          <span class="panel-num" aria-hidden="true">02</span>
+          <h2 class="panel-title" id="h-comp">Componentes de Red</h2>
+        </div>
+        <div class="panel-body">
+          <div class="comp-grid" id="compGrid" role="list">
+            <article class="c-card" data-type="edge" role="listitem" tabindex="0">
+              <div class="c-icon" aria-hidden="true">📱</div>
+              <div class="c-type">Edge · Cliente</div>
+              <div class="c-name">Dispositivo Cliente</div>
+              <div class="c-desc">Smartphones, Smart TVs, laptops. Decodificación ABR adaptativa. WiFi 6 / 5G / Ethernet.</div>
+              <span class="c-stat">5–25 Mbps (4K HDR)</span>
+            </article>
+            <article class="c-card" data-type="edge" role="listitem" tabindex="0">
+              <div class="c-icon" aria-hidden="true">🔀</div>
+              <div class="c-type">Edge · CPE</div>
+              <div class="c-name">Home Router</div>
+              <div class="c-desc">NAT, QoS, DOCSIS 3.1 / FTTH / xDSL. Primer salto de la red del usuario.</div>
+              <span class="c-stat">RTT: 2–5 ms al PoP</span>
+            </article>
+            <article class="c-card" data-type="isp" role="listitem" tabindex="0">
+              <div class="c-icon" aria-hidden="true">🏢</div>
+              <div class="c-type">ISP · Acceso</div>
+              <div class="c-name">Proveedor ISP</div>
+              <div class="c-desc">PoPs, routers de borde, DNS recursivo. Opera AS propio con BGP inter-dominio.</div>
+              <span class="c-stat">Claro / Movistar / ETECSA</span>
+            </article>
+            <article class="c-card" data-type="cdn" role="listitem" tabindex="0">
+              <div class="c-icon" aria-hidden="true">⚡</div>
+              <div class="c-type">CDN · Distribución</div>
+              <div class="c-name">Open Connect PoP</div>
+              <div class="c-desc">Appliances en ISPs / IXPs. Sirven video desde caché local. +1.000 PoPs globales.</div>
+              <span class="c-stat">Cache hit: ~95%</span>
+            </article>
+            <article class="c-card" data-type="core" role="listitem" tabindex="0">
+              <div class="c-icon" aria-hidden="true">🌐</div>
+              <div class="c-type">Core · Backbone</div>
+              <div class="c-name">Tier-1 / Core ISP</div>
+              <div class="c-desc">MPLS, fibra transoceánica, BGP inter-AS. Tránsito cuando el CDN no tiene caché.</div>
+              <span class="c-stat">100–400 Gbps/enlace</span>
+            </article>
+            <article class="c-card" data-type="core" role="listitem" tabindex="0">
+              <div class="c-icon" aria-hidden="true">🔗</div>
+              <div class="c-type">Core · Peering</div>
+              <div class="c-name">IXP</div>
+              <div class="c-desc">Punto neutro de peering entre ISPs y CDNs sin pagar tránsito. AMSIX, LINX, Equinix.</div>
+              <span class="c-stat">Latencia: +0.5–2 ms</span>
+            </article>
+            <article class="c-card" data-type="origin" role="listitem" tabindex="0">
+              <div class="c-icon" aria-hidden="true">⚖️</div>
+              <div class="c-type">Origen · LB</div>
+              <div class="c-name">Load Balancer</div>
+              <div class="c-desc">Capa 7 + Anycast. Dirige al PoP más cercano vía BGP. AWS ALB / NGINX / Envoy.</div>
+              <span class="c-stat">Anycast global</span>
+            </article>
+            <article class="c-card" data-type="origin" role="listitem" tabindex="0">
+              <div class="c-icon" aria-hidden="true">🖥️</div>
+              <div class="c-type">Origen · Cloud</div>
+              <div class="c-name">Microservicios AWS</div>
+              <div class="c-desc">Auth, catálogo, billing, recomendaciones. Video codificado en Object Storage S3.</div>
+              <span class="c-stat">+1.000 microservicios</span>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <!-- Calcs -->
+      <div class="panel" aria-labelledby="h-calc">
+        <div class="panel-hdr">
+          <span class="panel-num" aria-hidden="true">03</span>
+          <h2 class="panel-title" id="h-calc">Retardos &amp; Throughput</h2>
+        </div>
+        <div class="panel-body">
+          <div class="info-box" role="note">
+            <strong>Modelo de referencia</strong>
+            Madrid → CDN PoP Madrid → Origen AWS eu-west-1 (Irlanda). FTTH 600 Mbps. 4K HDR 25 Mbps H.265.
+          </div>
+          <div class="calc-grid">
+            <div class="calc-card">
+              <div class="calc-title">⏱ Retardo de Propagación</div>
+              <div class="formula" role="math" aria-label="Fórmula del retardo de propagación">
+                <div><span class="fv">d_prop</span><span class="fe">=</span>distancia / v_prop</div>
+                <div class="fnote">Madrid → CDN (~5 km, fibra)</div>
+                <div><span class="fv">d_prop</span><span class="fe">=</span><span class="fval">5.000 / 2×10⁸ ≈ 0.025 ms</span></div>
+                <div class="fnote">Madrid → Irlanda (~2.200 km)</div>
+                <div><span class="fv">d_prop</span><span class="fe">=</span><span class="fval">2.200.000 / 2×10⁸ ≈ 11 ms</span></div>
+                <div class="fres">RTT propagación (origen): ~22 ms</div>
+              </div>
+            </div>
+            <div class="calc-card">
+              <div class="calc-title">📦 Transmisión + Cola</div>
+              <div class="formula" role="math" aria-label="Fórmula del retardo de transmisión y cola">
+                <div><span class="fv">d_trans</span><span class="fe">=</span>L / R</div>
+                <div class="fnote">Segmento DASH 2 s × 25 Mbps = 50 Mb</div>
+                <div><span class="fv">d_trans</span><span class="fe">=</span><span class="fval">50 / 600 ≈ 83 ms</span></div>
+                <div class="fnote">Cola M/M/1 (ρ=0.6, 4–6 saltos)</div>
+                <div><span class="fv">d_cola</span><span class="fe">=</span><span class="fval">6–18 ms</span></div>
+                <div class="fres">RTT_CDN ≈ 88 ms · RTT_Origen ≈ 123 ms</div>
+              </div>
+            </div>
+          </div>
+          <!-- Latency bars -->
+          <h3 id="lat-h" style="font-family:var(--ff-mono);font-size:.58rem;color:var(--text-2);letter-spacing:.1em;text-transform:uppercase;margin:1rem 0 .65rem">Latencia por segmento</h3>
+          <div role="img" aria-labelledby="lat-h" aria-label="Barras de latencia comparativa por segmento de red">
+            <div class="lat-row"><span class="lat-lbl">WiFi/LAN</span><div class="lat-trk"><div class="lat-fill" style="width:3%;background:#00e5ff"></div></div><span class="lat-val">1–3 ms</span></div>
+            <div class="lat-row"><span class="lat-lbl">Home→ISP</span><div class="lat-trk"><div class="lat-fill" style="width:8%;background:#c471f5"></div></div><span class="lat-val">3–8 ms</span></div>
+            <div class="lat-row"><span class="lat-lbl">ISP→CDN</span><div class="lat-trk"><div class="lat-fill" style="width:6%;background:#ff6b35"></div></div><span class="lat-val">2–5 ms</span></div>
+            <div class="lat-row"><span class="lat-lbl">CDN→Core</span><div class="lat-trk"><div class="lat-fill" style="width:20%;background:#f9d71c"></div></div><span class="lat-val">8–20 ms</span></div>
+            <div class="lat-row"><span class="lat-lbl">Core→Origen</span><div class="lat-trk"><div class="lat-fill" style="width:40%;background:#39ff14"></div></div><span class="lat-val">15–45 ms</span></div>
+            <div class="lat-row"><span class="lat-lbl">TLS 1.3</span><div class="lat-trk"><div class="lat-fill" style="width:55%;background:#ff3b3b"></div></div><span class="lat-val">50–80 ms</span></div>
+          </div>
+          <!-- Throughput -->
+          <h3 id="tp-h" style="font-family:var(--ff-mono);font-size:.58rem;color:var(--text-2);letter-spacing:.1em;text-transform:uppercase;margin:1rem 0 .55rem">Throughput por tecnología</h3>
+          <div class="tp-grid-v" role="img" aria-labelledby="tp-h" aria-label="Comparativa de throughput por tecnología de acceso" id="tpChart">
+            <div class="tp-col"><div class="tp-bw"><div class="tp-b" data-pct="14" style="background:linear-gradient(to top,#c471f5,#9b4ec7);box-shadow:0 0 8px rgba(196,113,245,.5)"></div></div><div class="tp-lbl">ADSL<br><strong style="color:#c471f5">20M</strong></div></div>
+            <div class="tp-col"><div class="tp-bw"><div class="tp-b" data-pct="35" style="background:linear-gradient(to top,#7c5fc4,#c471f5);box-shadow:0 0 8px rgba(196,113,245,.4)"></div></div><div class="tp-lbl">4G<br><strong style="color:#c471f5">50M</strong></div></div>
+            <div class="tp-col"><div class="tp-bw"><div class="tp-b" data-pct="60" style="background:linear-gradient(to top,#c8a800,#f9d71c);box-shadow:0 0 10px rgba(249,215,28,.5)"></div></div><div class="tp-lbl">5G<br><strong style="color:#f9d71c">150M</strong></div></div>
+            <div class="tp-col"><div class="tp-bw"><div class="tp-b" data-pct="80" style="background:linear-gradient(to top,#cc4400,#ff6b35);box-shadow:0 0 12px rgba(255,107,53,.5)"></div></div><div class="tp-lbl">FTTH<br><strong style="color:#ff6b35">600M</strong></div></div>
+            <div class="tp-col"><div class="tp-bw"><div class="tp-b" data-pct="95" style="background:linear-gradient(to top,#00a8cc,#00e5ff);box-shadow:0 0 14px rgba(0,229,255,.6)"></div></div><div class="tp-lbl">10G<br><strong style="color:#00e5ff">10G</strong></div></div>
+          </div>
+          <div style="font-family:var(--ff-mono);font-size:clamp(.5rem,1.2vw,.58rem);color:var(--text-2);text-align:center">
+            4K HDR: <span style="color:#ff6b35">25 Mbps</span> · 1080p: <span style="color:#f9d71c">8 Mbps</span> · SD: <span style="color:var(--text-2)">3 Mbps</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROTOCOLS -->
+  <section class="s-protos panel" aria-labelledby="h-protos">
+    <div class="panel-hdr">
+      <span class="panel-num" aria-hidden="true">04</span>
+      <h2 class="panel-title" id="h-protos">Protocolos de Aplicación</h2>
+    </div>
+    <div class="panel-body">
+      <div class="proto-inner">
+        <!-- Flow -->
+        <div>
+          <h3 id="h-flow" style="font-family:var(--ff-mono);font-size:.6rem;color:var(--neon-cyan);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.85rem">Flujo: del click al video</h3>
+          <ol class="flow-list" aria-labelledby="h-flow">
+            <li class="flow-item" data-n="1">
+              <div class="flow-top"><span class="flow-name">Resolución DNS</span><span class="ptag pt-v">DNS / DoH</span></div>
+              <div class="flow-time">⏱ 0 ms → 15 ms</div>
+              <div class="flow-desc">GeoDNS devuelve la IP del CDN PoP más cercano. DoH cifra la consulta sobre HTTPS (port 443).</div>
+            </li>
+            <li class="flow-item" data-n="2">
+              <div class="flow-top"><span class="flow-name">TLS 1.3 Handshake</span><span class="ptag pt-a">TLS 1.3</span></div>
+              <div class="flow-time">⏱ 15 ms → 80 ms (1-RTT)</div>
+              <div class="flow-desc">Negocia ALPN <code>h3</code>. ECDHE + AES-256-GCM. Perfect Forward Secrecy activa siempre.</div>
+            </li>
+            <li class="flow-item" data-n="3">
+              <div class="flow-top"><span class="flow-name">HTTP/3 + QUIC</span><span class="ptag pt-c">HTTP/3</span></div>
+              <div class="flow-time">⏱ 80 ms → 95 ms</div>
+              <div class="flow-desc">GET al <code>manifest.mpd</code>. Sin HoL blocking. Múltiples streams UDP independientes sobre una sola conexión.</div>
+            </li>
+            <li class="flow-item" data-n="4">
+              <div class="flow-top"><span class="flow-name">Auth JWT + DRM</span><span class="ptag pt-a">HTTPS/JWT</span></div>
+              <div class="flow-time">⏱ 90 ms → 200 ms</div>
+              <div class="flow-desc">Verifica suscripción. Emite licencia DRM Widevine L1/L3, FairPlay o PlayReady según dispositivo.</div>
+            </li>
+            <li class="flow-item" data-n="5">
+              <div class="flow-top"><span class="flow-name">MPEG-DASH ABR</span><span class="ptag pt-g">DASH/HLS</span></div>
+              <div class="flow-time">⏱ 200 ms → continuo</div>
+              <div class="flow-desc">Segmentos de 2–4 s en múltiples representaciones. ABR (BOLA/Pensieve) adapta calidad según buffer y throughput.</div>
+            </li>
+            <li class="flow-item" data-n="6">
+              <div class="flow-top"><span class="flow-name">SMTP + Push</span><span class="ptag pt-r">SMTP/FCM</span></div>
+              <div class="flow-time">⏱ Asíncrono</div>
+              <div class="flow-desc">Emails transaccionales via SMTPS + DKIM/SPF/DMARC. Notificaciones push via FCM (Android) o APNs (iOS).</div>
+            </li>
+          </ol>
+        </div>
+        <!-- Table -->
+        <div>
+          <h3 id="h-tbl" style="font-family:var(--ff-mono);font-size:.6rem;color:var(--neon-cyan);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.85rem">Tabla comparativa</h3>
+          <div class="tbl-scroll">
+            <table>
+              <caption class="sr-only">Comparativa de protocolos de aplicación usados en el servicio de streaming</caption>
+              <colgroup><col><col><col><col></colgroup>
+              <thead>
+                <tr>
+                  <th scope="col">Protocolo</th>
+                  <th scope="col">Capa</th>
+                  <th scope="col">Función</th>
+                  <th scope="col">Puerto</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td data-lbl="Protocolo"><span class="ptag pt-v">DNS/DoH</span></td>
+                  <td data-lbl="Capa">7</td>
+                  <td data-lbl="Función">Resolución + GeoDNS, TTL bajo para failover rápido</td>
+                  <td data-lbl="Puerto">53 / 443</td>
+                </tr>
+                <tr>
+                  <td data-lbl="Protocolo"><span class="ptag pt-c">HTTP/3</span></td>
+                  <td data-lbl="Capa">7</td>
+                  <td data-lbl="Función">Manifiestos DASH, segmentos de video y APIs REST</td>
+                  <td data-lbl="Puerto">443 UDP</td>
+                </tr>
+                <tr>
+                  <td data-lbl="Protocolo"><span class="ptag pt-c">QUIC</span></td>
+                  <td data-lbl="Capa">4</td>
+                  <td data-lbl="Función">Reemplaza TCP+TLS, 0-RTT, migración de IP/red</td>
+                  <td data-lbl="Puerto">443 UDP</td>
+                </tr>
+                <tr>
+                  <td data-lbl="Protocolo"><span class="ptag pt-a">TLS 1.3</span></td>
+                  <td data-lbl="Capa">5</td>
+                  <td data-lbl="Función">Cifrado E2E, Perfect Forward Secrecy, 1-RTT</td>
+                  <td data-lbl="Puerto">443</td>
+                </tr>
+                <tr>
+                  <td data-lbl="Protocolo"><span class="ptag pt-g">DASH</span></td>
+                  <td data-lbl="Capa">7</td>
+                  <td data-lbl="Función">Streaming adaptativo ABR, manifiesto MPD</td>
+                  <td data-lbl="Puerto">443</td>
+                </tr>
+                <tr>
+                  <td data-lbl="Protocolo"><span class="ptag pt-r">SMTP</span></td>
+                  <td data-lbl="Capa">7</td>
+                  <td data-lbl="Función">Emails transaccionales con DKIM/SPF/DMARC</td>
+                  <td data-lbl="Puerto">465 / 587</td>
+                </tr>
+                <tr>
+                  <td data-lbl="Protocolo"><span class="ptag pt-a">BGP</span></td>
+                  <td data-lbl="Capa">3</td>
+                  <td data-lbl="Función">Enrutamiento inter-AS, Anycast global</td>
+                  <td data-lbl="Puerto">179 TCP</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECURITY -->
+  <section class="s-security panel" aria-labelledby="h-sec">
+    <div class="panel-hdr">
+      <span class="panel-num" aria-hidden="true">05</span>
+      <h2 class="panel-title" id="h-sec">Medidas de Seguridad Propuestas</h2>
+    </div>
+    <div class="panel-body">
+      <div class="info-box" role="note">
+        <strong>Modelo de amenaza</strong>
+        DDoS volumétrico · MITM / intercepción · Robo de credenciales · Bypass DRM · Exfiltración de datos · BGP hijacking
+      </div>
+      <div class="sec-grid">
+        <div class="sec-card sc-crit" tabindex="0">
+          <div class="sec-lvl">🔴 Crítico — Red</div>
+          <h3>Protección Anti-DDoS</h3>
+          <ul class="sec-ul">
+            <li>Anycast distribuye tráfico malicioso en todos los PoPs globales.</li>
+            <li>BGP FlowSpec para rate limiting y blackholing automático por IP.</li>
+            <li>Scrubbing centers con filtros stateful (SYN/UDP/ICMP flooding).</li>
+            <li>Capacidad ×5 del pico en cada PoP para absorber ataques.</li>
+            <li>RTBH en el upstream para descarte temprano.</li>
+          </ul>
+        </div>
+        <div class="sec-card sc-crit" tabindex="0">
+          <div class="sec-lvl">🔴 Crítico — Transporte</div>
+          <h3>Cifrado Extremo a Extremo</h3>
+          <ul class="sec-ul">
+            <li>TLS 1.3 obligatorio. Deshabilitar TLS ≤1.2 y SSLv3.</li>
+            <li>Solo cipher suites fuertes: AES-256-GCM, ChaCha20-Poly1305.</li>
+            <li>Certificate Pinning en la app cliente (anti-MITM).</li>
+            <li>HSTS max-age ≥ 1 año + preload en navegadores.</li>
+            <li>QUIC: sesión cifrada incluyendo encabezados QUIC.</li>
+          </ul>
+        </div>
+        <div class="sec-card sc-high" tabindex="0">
+          <div class="sec-lvl">🟠 Alto — Contenido</div>
+          <h3>DRM y Control de Acceso</h3>
+          <ul class="sec-ul">
+            <li>Multi-DRM: Widevine L1/L3, FairPlay, PlayReady según dispositivo.</li>
+            <li>URL signing HMAC-SHA256, TTL de 30 s por segmento.</li>
+            <li>Watermarking forense invisible para rastrear filtraciones.</li>
+            <li>Geoblocking IP + GPS (móvil) por territorios con licencia.</li>
+            <li>Device fingerprinting anti-stream sharing ilegal.</li>
+          </ul>
+        </div>
+        <div class="sec-card sc-high" tabindex="0">
+          <div class="sec-lvl">🟠 Alto — Identidad</div>
+          <h3>Autenticación Robusta</h3>
+          <ul class="sec-ul">
+            <li>OAuth 2.0 + OpenID Connect. JWT TTL 15 min + Refresh Token rotativo.</li>
+            <li>MFA (TOTP/SMS) para cambios críticos de cuenta.</li>
+            <li>Detección anomalías: login desde nuevo país → challenge automático.</li>
+            <li>Rate limiting /login: 5 intentos/min → CAPTCHA → lockout progresivo.</li>
+          </ul>
+        </div>
+        <div class="sec-card sc-med" tabindex="0">
+          <div class="sec-lvl">🟡 Medio — DNS/PKI</div>
+          <h3>Seguridad DNS</h3>
+          <ul class="sec-ul">
+            <li>DNSSEC firmado en todas las zonas del dominio.</li>
+            <li>DoH en apps para impedir inspección del ISP.</li>
+            <li>CAA records + Certificate Transparency (CT Logs).</li>
+            <li>RPKI para validar rutas BGP (anti BGP hijacking).</li>
+          </ul>
+        </div>
+        <div class="sec-card sc-med" tabindex="0">
+          <div class="sec-lvl">🟡 Medio — Email</div>
+          <h3>Anti-Phishing SMTP</h3>
+          <ul class="sec-ul">
+            <li>SPF + DKIM (Ed25519) + DMARC p=reject.</li>
+            <li>BIMI para logo de la empresa en bandejas compatibles.</li>
+            <li>SMTPS (465) / STARTTLS (587). Sin SMTP plaintext.</li>
+          </ul>
+        </div>
+        <div class="sec-card sc-low" tabindex="0">
+          <div class="sec-lvl">🟢 Estándar — Aplicación</div>
+          <h3>WAF y AppSec</h3>
+          <ul class="sec-ul">
+            <li>WAF en CDN: bloquea OWASP Top 10 (SQLi, XSS, CSRF).</li>
+            <li>CSP + SRI (SHA-384) en todos los recursos externos.</li>
+            <li>Pentesting trimestral + bug bounty activo.</li>
+            <li>Zero Trust entre microservicios (allowlist explícita).</li>
+          </ul>
+        </div>
+        <div class="sec-card sc-low" tabindex="0">
+          <div class="sec-lvl">🟢 Estándar — Compliance</div>
+          <h3>Privacidad y Legal</h3>
+          <ul class="sec-ul">
+            <li>GDPR / CCPA: datos en reposo AES-256. Derecho de supresión.</li>
+            <li>Logs anonimizados (IPs hasheadas, retención 90 días).</li>
+            <li>Data residency EU. SOC 2 Type II / ISO 27001 anuales.</li>
+            <li>Incident Response: notificación GDPR Art.33 en 72 h.</li>
+          </ul>
+        </div>
+      </div>
+      <h3 id="h-osi" style="font-family:var(--ff-mono);font-size:.6rem;color:var(--neon-cyan);letter-spacing:.1em;text-transform:uppercase;margin:1.25rem 0 0">Mapa de seguridad por capa OSI</h3>
+      <div class="osi-grid" role="list" aria-labelledby="h-osi">
+        <div class="osi-item" style="border-left:2px solid var(--critical)" role="listitem"><div class="osi-lbl">Capa 7</div><div class="osi-val">WAF, DRM, JWT, DKIM, HSTS, CSP</div></div>
+        <div class="osi-item" style="border-left:2px solid var(--high)" role="listitem"><div class="osi-lbl">Capa 6–5</div><div class="osi-val">TLS 1.3, Cert Pinning, ALPN</div></div>
+        <div class="osi-item" style="border-left:2px solid var(--medium)" role="listitem"><div class="osi-lbl">Capa 4</div><div class="osi-val">QUIC cifrado, TCP syn-cookies</div></div>
+        <div class="osi-item" style="border-left:2px solid var(--low)" role="listitem"><div class="osi-lbl">Capa 3</div><div class="osi-val">RPKI, BGP FlowSpec, RTBH, Anycast</div></div>
+        <div class="osi-item" style="border-left:2px solid var(--neon-violet)" role="listitem"><div class="osi-lbl">DNS / PKI</div><div class="osi-val">DNSSEC, DoH, CAA, CT Logs</div></div>
+        <div class="osi-item" style="border-left:2px solid var(--neon-cyan)" role="listitem"><div class="osi-lbl">Compliance</div><div class="osi-val">GDPR, SOC 2, ISO 27001</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ASIDE -->
+  <aside aria-label="Panel de controles y configuración">
+
+    <!-- Group 1: Filter -->
+    <div class="a-panel">
+      <div class="a-group" id="g-filter">
+        <div class="a-hdr" role="button" aria-expanded="true" aria-controls="gb-filter" tabindex="0"
+          onclick="toggleG('g-filter')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleG('g-filter')">
+          <span class="a-hdr-title">🔎 Filtrar Componentes</span>
+          <span class="a-arrow" aria-hidden="true">▾</span>
+        </div>
+        <div class="a-body" id="gb-filter">
+          <p style="font-family:var(--ff-mono);font-size:.56rem;color:var(--text-2);margin-bottom:.4rem">Mostrar por tipo:</p>
+          <div class="filter-grp" role="group" aria-label="Filtros de tipo de componente">
+            <button class="fbtn active" data-f="all" aria-pressed="true" onclick="filterC(event)"  data-f="all"  >Todos</button>
+            <button class="fbtn" data-f="edge" aria-pressed="false" onclick="filterC(event)"  data-f="edge" >Edge</button>
+            <button class="fbtn" data-f="isp" aria-pressed="false" onclick="filterC(event)"  data-f="isp"  >ISP</button>
+            <button class="fbtn" data-f="cdn" aria-pressed="false" onclick="filterC(event)"  data-f="cdn"  >CDN</button>
+            <button class="fbtn" data-f="core" aria-pressed="false" onclick="filterC(event)"  data-f="core" >Core</button>
+            <button class="fbtn" data-f="origin" aria-pressed="false" onclick="filterC(event)"  data-f="origin">Origen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group 2: Delay calculator -->
+    <div class="a-panel">
+      <div class="a-group" id="g-calc">
+        <div class="a-hdr" role="button" aria-expanded="true" aria-controls="gb-calc" tabindex="0"
+          onclick="toggleG('g-calc')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleG('g-calc')">
+          <span class="a-hdr-title">📐 Calculadora Retardo</span>
+          <span class="a-arrow" aria-hidden="true">▾</span>
+        </div>
+        <div class="a-body" id="gb-calc">
+          <div class="ctrl">
+            <label for="i-dist">Distancia (km)</label>
+            <input type="number" id="i-dist" value="2200" min="1" max="20000">
+          </div>
+          <div class="ctrl">
+            <label for="i-bw">Ancho de banda (Mbps)</label>
+            <input type="number" id="i-bw" value="600" min="1" max="10000">
+          </div>
+          <div class="ctrl">
+            <label for="i-seg">Tamaño segmento (Mb)</label>
+            <input type="number" id="i-seg" value="50" min="1" max="500">
+          </div>
+          <div class="ctrl">
+            <label for="i-util">Utilización enlace: <span id="util-v">60%</span></label>
+            <input type="range" id="i-util" min="10" max="95" step="5" value="60"
+              oninput="document.getElementById('util-v').textContent=this.value+'%'"
+              aria-valuemin="10" aria-valuemax="95" aria-valuenow="60">
+          </div>
+          <button class="btn-calc" id="btnCalc" onclick="doCalc()" aria-label="Calcular retardos con los parámetros configurados">▶ CALCULAR</button>
+          <div class="result-box" id="calcRes" role="status" aria-live="polite">
+            <div><span class="r-lbl">d_prop</span><span class="r-val" id="r-prop">–</span></div>
+            <div><span class="r-lbl">d_trans</span><span class="r-val" id="r-trans">–</span></div>
+            <div><span class="r-lbl">d_cola</span><span class="r-val" id="r-cola">–</span></div>
+            <div style="border-top:1px solid rgba(255,255,255,.08);margin-top:.3rem;padding-top:.3rem">
+              <span class="r-lbl">RTT total</span><span class="r-val r-warn" id="r-rtt">–</span>
+            </div>
+            <div><span class="r-lbl">Throughput</span><span class="r-val r-good" id="r-tp">–</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group 3: Diagram controls -->
+    <div class="a-panel">
+      <div class="a-group" id="g-anim">
+        <div class="a-hdr" role="button" aria-expanded="true" aria-controls="gb-anim" tabindex="0"
+          onclick="toggleG('g-anim')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleG('g-anim')">
+          <span class="a-hdr-title">🎛 Diagrama 3D</span>
+          <span class="a-arrow" aria-hidden="true">▾</span>
+        </div>
+        <div class="a-body" id="gb-anim">
+          <div class="ctrl">
+            <label for="a-speed">Velocidad flujo: <span id="sp-v">1.5×</span></label>
+            <input type="range" id="a-speed" min="0.5" max="4" step="0.5" value="1.5"
+              oninput="setSpd(this.value)" aria-valuemin="0.5" aria-valuemax="4">
+          </div>
+          <div class="ctrl">
+            <label for="a-angle">Ángulo 3D: <span id="ang-v">18°</span></label>
+            <input type="range" id="a-angle" min="0" max="40" step="2" value="18"
+              oninput="setAng(this.value)" aria-valuemin="0" aria-valuemax="40">
+          </div>
+          <label class="chk-row" for="a-lbl">
+            <input type="checkbox" id="a-lbl" checked onchange="gLabels=this.checked">
+            <span>Mostrar etiquetas</span>
+          </label>
+          <label class="chk-row" for="a-glow">
+            <input type="checkbox" id="a-glow" checked onchange="gGlow=this.checked">
+            <span>Efecto de brillo</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Group 4: Scenario (collapsed by default) -->
+    <div class="a-panel">
+      <div class="a-group collapsed" id="g-scene">
+        <div class="a-hdr" role="button" aria-expanded="false" aria-controls="gb-scene" tabindex="0"
+          onclick="toggleG('g-scene')" onkeydown="if(event.key==='Enter'||event.key===' ')toggleG('g-scene')">
+          <span class="a-hdr-title">🌍 Escenario</span>
+          <span class="a-arrow" aria-hidden="true">▾</span>
+        </div>
+        <div class="a-body" id="gb-scene">
+          <div class="ctrl">
+            <label for="sel-sc">Seleccionar escenario</label>
+            <select id="sel-sc" onchange="loadScene(this.value)">
+              <option value="netflix">Netflix / Streaming</option>
+              <option value="corp">Empresa Distribuida</option>
+              <option value="iot">IoT Industrial</option>
+            </select>
+          </div>
+          <div class="result-box" id="sc-info" role="status" aria-live="polite">
+            <div><span class="r-lbl">Usuarios</span><span class="r-val">238 M</span></div>
+            <div><span class="r-lbl">CDN PoPs</span><span class="r-val">1.000+</span></div>
+            <div><span class="r-lbl">Tráfico pico</span><span class="r-val r-warn">640 Tbps</span></div>
+            <div><span class="r-lbl">Protocolo</span><span class="r-val r-good">HTTP/3</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+</main>
+
+<!-- ══════════════════════════════
+     FOOTER
+══════════════════════════════ -->
+<footer role="contentinfo">
+  <div class="foot-grid">
+
+    <div>
+      <h2 class="foot-col-title">Conceptos Clave</h2>
+      <div class="foot-concept"><strong>RTT (Round-Trip Time)</strong> Tiempo de ida y vuelta de un paquete. RTT = 2×d_prop + d_trans + d_cola. Con CDN hit ≈ 88 ms; sin CDN ≈ 200 ms.</div>
+      <div class="foot-concept"><strong>Throughput efectivo</strong> Caudal de datos útiles ≤ capacidad del canal. El cuello de botella siempre es el eslabón más lento (generalmente el último kilómetro).</div>
+      <div class="foot-concept"><strong>CDN</strong> Infraestructura distribuida que aproxima el contenido al usuario, reduciendo latencia y descargando los servidores de origen.</div>
+    </div>
+
+    <div>
+      <h2 class="foot-col-title">Protocolos</h2>
+      <div class="foot-concept"><strong>HTTP/3 / QUIC</strong> Tercera versión de HTTP sobre UDP+QUIC, eliminando Head-of-Line blocking. 0-RTT resumption. Migración de conexión entre WiFi y 5G.</div>
+      <div class="foot-concept"><strong>BGP</strong> Protocolo de enrutamiento exterior entre Sistemas Autónomos (AS). Gestiona el Anycast global y la resiliencia del enrutamiento entre ISPs.</div>
+      <div class="foot-concept"><strong>TLS 1.3</strong> Handshake en 1-RTT. Elimina cifrados débiles. Perfect Forward Secrecy siempre activa. Integrado en QUIC para HTTP/3.</div>
+    </div>
+
+    <div>
+      <h2 class="foot-col-title">Modelo OSI Aplicado</h2>
+      <div class="foot-concept">Capa 7 — HTTP/3, DNS, SMTP, DASH, DRM</div>
+      <div class="foot-concept">Capa 5–6 — TLS 1.3, sesión segura, cifrado</div>
+      <div class="foot-concept">Capa 4 — QUIC (UDP), TCP (SMTP)</div>
+      <div class="foot-concept">Capa 3 — IP, BGP, MPLS, RPKI, Anycast</div>
+      <div class="foot-concept">Capa 2 — Ethernet, WiFi 6, 5G NR</div>
+      <div class="foot-concept">Capa 1 — Fibra óptica GPON/DWDM, coaxial</div>
+    </div>
+
+    <div>
+      <h2 class="foot-col-title">Recursos Adicionales</h2>
+      <nav class="foot-links" aria-label="Links a recursos sobre redes">
+        <a href="https://www.ietf.org/rfc/rfc9000.txt" target="_blank" rel="noopener noreferrer" class="foot-link">RFC 9000 — QUIC Transport Protocol</a>
+        <a href="https://www.ietf.org/rfc/rfc9114.txt" target="_blank" rel="noopener noreferrer" class="foot-link">RFC 9114 — HTTP/3 Specification</a>
+        <a href="https://netflixtechblog.com" target="_blank" rel="noopener noreferrer" class="foot-link">Netflix Tech Blog — Arquitectura CDN</a>
+        <a href="https://www.cloudflare.com/learning/ddos/what-is-a-ddos-attack/" target="_blank" rel="noopener noreferrer" class="foot-link">Cloudflare — DDoS Mitigation</a>
+        <a href="https://developer.mozilla.org/es/docs/Web/HTTP/Overview" target="_blank" rel="noopener noreferrer" class="foot-link">MDN — Visión general de HTTP</a>
+        <a href="https://www.rfc-editor.org/rfc/rfc4271" target="_blank" rel="noopener noreferrer" class="foot-link">RFC 4271 — BGP-4 Protocol</a>
+      </nav>
+    </div>
+
+  </div>
+  <div class="foot-bottom">
+    <span>God Mode Taller · Redes de Computadoras · Análisis de Escenario Real</span>
+    <span>
+      <span style="color:var(--neon-cyan)">01</span> Topología ·
+      <span style="color:var(--neon-violet)">02</span> Componentes ·
+      <span style="color:var(--neon-amber)">03</span> Retardos ·
+      <span style="color:var(--neon-green)">04</span> Protocolos ·
+      <span style="color:var(--critical)">05</span> Seguridad
+    </span>
+    <span>L99</span>
+  </div>
+</footer>
+
+<script>
+'use strict';
+
+
+/* ── Aside: toggle groups ── */
+const toggleG = id => {
+  const g = document.getElementById(id);
+  const btn = g.querySelector('[role="button"]');
+  const isCol = g.classList.contains('collapsed');
+  g.classList.toggle('collapsed', !isCol);
+  btn.setAttribute('aria-expanded', isCol ? 'true' : 'false');
+};
+
+/* ── Filter components ── */
+const filterC = (ev) => {
+  const btn  = ev.currentTarget || ev.target;
+  const type = btn.dataset.f || 'all';
+  document.querySelectorAll('.fbtn').forEach(b => {
+    b.classList.remove('active');
+    b.setAttribute('aria-pressed', 'false');
+  });
+  btn.classList.add('active');
+  btn.setAttribute('aria-pressed', 'true');
+  document.querySelectorAll('#compGrid .c-card').forEach(card => {
+    const show = type === 'all' || card.dataset.type === type;
+    if (show) {
+      card.style.display = '';
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(6px)';
+      requestAnimationFrame(() => {
+        card.style.transition = 'opacity .3s ease, transform .3s ease';
+        card.style.opacity = '1';
+        card.style.transform = 'translateY(0)';
+      });
+    } else {
+      card.style.transition = 'opacity .2s ease';
+      card.style.opacity = '0';
+      setTimeout(() => { card.style.display = 'none'; }, 200);
+    }
+  });
+};
+
+/* ── Delay calculator ── */
+const doCalc = () => {
+  const dist = parseFloat(document.getElementById('i-dist').value) || 2200;
+  const bw   = parseFloat(document.getElementById('i-bw').value)   || 600;
+  const seg  = parseFloat(document.getElementById('i-seg').value)  || 50;
+  const util = parseFloat(document.getElementById('i-util').value) / 100 || 0.6;
+  const vFiber = 2e5; // km/s
+  const dProp  = (dist / vFiber) * 1000;
+  const dTrans = (seg / bw) * 1000;
+  const dCola  = util < 0.95 ? ((util / (1 - util)) * 1 * 4).toFixed(2) : '>100';
+  const rtt    = (2 * dProp + dTrans + (parseFloat(dCola) || 50)).toFixed(1);
+  document.getElementById('r-prop').textContent  = dProp.toFixed(2)  + ' ms';
+  document.getElementById('r-trans').textContent = dTrans.toFixed(2) + ' ms';
+  document.getElementById('r-cola').textContent  = dCola + ' ms';
+  document.getElementById('r-rtt').textContent   = rtt + ' ms';
+  document.getElementById('r-tp').textContent    = Math.min(bw, 10000) + ' Mbps';
+  const b = document.getElementById('btnCalc');
+  b.textContent = '✓ CALCULADO';
+  b.style.cssText += ';background:rgba(57,255,20,.15);border-color:#39ff14;color:#39ff14';
+  setTimeout(() => {
+    b.textContent = '▶ CALCULAR';
+    b.style.background = b.style.borderColor = b.style.color = '';
+  }, 2000);
+};
+
+/* ── Scenario loader ── */
+const scenarios = {
+  netflix: {u:'238 M',p:'1.000+',t:'640 Tbps',pr:'HTTP/3'},
+  corp:    {u:'50.000',p:'8 sitios',t:'40 Gbps',pr:'SD-WAN/MPLS'},
+  iot:     {u:'5 M devices',p:'Edge local',t:'800 Mbps',pr:'MQTT/CoAP'},
+};
+const loadScene = key => {
+  const s = scenarios[key] || scenarios.netflix;
+  const box = document.getElementById('sc-info');
+  box.style.opacity = '0';
+  setTimeout(() => {
+    box.innerHTML = `<div><span class="r-lbl">Usuarios</span><span class="r-val">${s.u}</span></div>
+      <div><span class="r-lbl">CDN/PoPs</span><span class="r-val">${s.p}</span></div>
+      <div><span class="r-lbl">Tráfico pico</span><span class="r-val r-warn">${s.t}</span></div>
+      <div><span class="r-lbl">Protocolo</span><span class="r-val r-good">${s.pr}</span></div>`;
+    box.style.transition = 'opacity .3s ease';
+    box.style.opacity = '1';
+  }, 180);
+};
+
+/* ══════════════════════════════════════
+   CANVAS 3D DIAGRAM
+══════════════════════════════════════ */
+const cvs = document.getElementById('dCvs');
+const ctx = cvs.getContext('2d');
+let gSpd = 1.5, gAng = 18, gLabels = true, gGlow = true, gAF;
+
+const setSpd = v => {
+  gSpd = parseFloat(v);
+  const vt = v + '×';
+  const el1 = document.getElementById('sp-v');
+  const el2 = document.getElementById('q-sp-v');
+  if(el1) el1.textContent = vt;
+  if(el2) el2.textContent = vt;
+};
+const setAng = v => {
+  gAng = parseFloat(v);
+  const vt = v + '°';
+  const el1 = document.getElementById('ang-v');
+  const el2 = document.getElementById('q-ang-v');
+  if(el1) el1.textContent = vt;
+  if(el2) el2.textContent = vt;
+};
+
+const resizeCvs = () => {
+  const w = cvs.parentElement;
+  cvs.width  = w.clientWidth  || w.offsetWidth  || 600;
+  cvs.height = w.clientHeight || w.offsetHeight || 200;
+};
+
+/* 3D oblique projection */
+const proj = (x, y, z, W, H) => {
+  const rad = gAng * Math.PI / 180;
+  return {
+    x: (x + z * Math.cos(rad) * 0.45) * W,
+    y: (y - z * Math.sin(rad) * 0.5)  * H,
+  };
+};
+
+const NODES = [
+  {id:'ph', lbl:'Smartphone', x:.06,y:.28,z:.00,col:'#00e5ff'},
+  {id:'tv', lbl:'Smart TV',   x:.06,y:.50,z:.00,col:'#00e5ff'},
+  {id:'lp', lbl:'Laptop',     x:.06,y:.72,z:.00,col:'#00e5ff'},
+  {id:'rt', lbl:'Router',     x:.18,y:.50,z:.08,col:'#c471f5'},
+  {id:'ip', lbl:'ISP PoP',    x:.30,y:.33,z:.12,col:'#c471f5'},
+  {id:'dn', lbl:'DNS',        x:.30,y:.67,z:.12,col:'#c471f5'},
+  {id:'c1', lbl:'CDN PoP',    x:.46,y:.24,z:.18,col:'#ff6b35'},
+  {id:'c2', lbl:'CDN Edge',   x:.46,y:.50,z:.18,col:'#ff6b35'},
+  {id:'c3', lbl:'IXP/CDN',    x:.46,y:.76,z:.18,col:'#ff6b35'},
+  {id:'bg', lbl:'BGP Core',   x:.62,y:.35,z:.22,col:'#f9d71c'},
+  {id:'ix', lbl:'IXP',        x:.62,y:.65,z:.22,col:'#f9d71c'},
+  {id:'lb', lbl:'LB',         x:.80,y:.24,z:.28,col:'#39ff14'},
+  {id:'ap', lbl:'API',        x:.80,y:.48,z:.28,col:'#39ff14'},
+  {id:'s3', lbl:'Storage',    x:.80,y:.68,z:.28,col:'#39ff14'},
+  {id:'dr', lbl:'Auth/DRM',   x:.80,y:.88,z:.28,col:'#39ff14'},
+];
+
+const EDGES = [
+  // Clients → Router
+  {a:'ph',b:'rt',m:1,col:'#00e5ff'},{a:'tv',b:'rt',m:1,col:'#00e5ff'},{a:'lp',b:'rt',m:0,col:'#00e5ff'},
+  // Router → ISP / DNS
+  {a:'rt',b:'ip',m:1,col:'#c471f5'},{a:'rt',b:'dn',m:0,col:'#c471f5'},
+  // ISP → CDN PoPs
+  {a:'ip',b:'c1',m:1,col:'#ff6b35'},{a:'ip',b:'c2',m:0,col:'#ff6b35'},{a:'ip',b:'c3',m:0,col:'#ff6b35'},
+  // DNS → CDN
+  {a:'dn',b:'c1',m:0,col:'#ff6b35'},{a:'dn',b:'c2',m:0,col:'#ff6b35'},
+  // CDN inter-links
+  {a:'c1',b:'c2',m:0,col:'#ff6b35'},{a:'c2',b:'c3',m:0,col:'#ff6b35'},
+  // CDN → Core
+  {a:'c1',b:'bg',m:1,col:'#f9d71c'},{a:'c2',b:'bg',m:0,col:'#f9d71c'},
+  {a:'c3',b:'ix',m:1,col:'#f9d71c'},{a:'c2',b:'ix',m:0,col:'#f9d71c'},
+  // Core cross
+  {a:'bg',b:'ix',m:0,col:'#f9d71c'},
+  // Core → Origin
+  {a:'bg',b:'lb',m:1,col:'#39ff14'},{a:'bg',b:'ap',m:1,col:'#39ff14'},
+  {a:'ix',b:'lb',m:0,col:'#39ff14'},{a:'ix',b:'s3',m:0,col:'#39ff14'},
+  // Origin internal
+  {a:'lb',b:'ap',m:1,col:'#39ff14'},{a:'ap',b:'s3',m:0,col:'#39ff14'},
+  {a:'ap',b:'dr',m:1,col:'#39ff14'},{a:'lb',b:'dr',m:0,col:'#39ff14'},
+];
+
+const PKTS = EDGES.filter(e=>e.m).map(e => ({
+  ...e,
+  prog: Math.random(),
+  spd:  .0025 + Math.random()*.003,
+}));
+
+const nPos = (id,W,H) => {
+  const n = NODES.find(n=>n.id===id);
+  return proj(n.x, n.y, n.z, W, H);
+};
+
+const draw = () => {
+  const W = cvs.width, H = cvs.height;
+  ctx.clearRect(0, 0, W, H);
+
+  /* Grid floor */
+  ctx.save();
+  ctx.strokeStyle = 'rgba(0,229,255,.055)';
+  ctx.lineWidth = .5;
+  for (let i=0;i<=10;i++){
+    const f = i/10;
+    const a = proj(f,.92,.00,W,H), b = proj(f,.92,.32,W,H);
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+  for (let j=0;j<=8;j++){
+    const z = j/8*.32;
+    const a = proj(0,.92,z,W,H), b = proj(1,.92,z,W,H);
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+  ctx.restore();
+
+  /* Edges */
+  EDGES.forEach(({a,b,m,col}) => {
+    const pa = nPos(a,W,H), pb = nPos(b,W,H);
+    const cx = (pa.x+pb.x)/2, cy = (pa.y+pb.y)/2 - (pb.x-pa.x)*.05;
+    ctx.save();
+    if (m) {
+      // Glowing main edge
+      const hex = col || '#00e5ff';
+      ctx.strokeStyle = hex + '55';
+      ctx.lineWidth = 1.8;
+      if(gGlow){ ctx.shadowColor=hex; ctx.shadowBlur=6; }
+    } else {
+      ctx.strokeStyle = (col||'#8888cc') + '28';
+      ctx.lineWidth = .7;
+      ctx.setLineDash([3,5]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(pa.x,pa.y);
+    ctx.quadraticCurveTo(cx,cy,pb.x,pb.y);
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  /* Packets */
+  PKTS.forEach(pk => {
+    const pa = nPos(pk.a,W,H), pb = nPos(pk.b,W,H);
+    const cx = (pa.x+pb.x)/2, cy = (pa.y+pb.y)/2 - (pb.x-pa.x)*.05;
+    pk.prog = (pk.prog + pk.spd * gSpd) % 1;
+    const t = pk.prog;
+    const px = (1-t)*(1-t)*pa.x + 2*(1-t)*t*cx + t*t*pb.x;
+    const py = (1-t)*(1-t)*pa.y + 2*(1-t)*t*cy + t*t*pb.y;
+    const pCol = pk.col || '#00e5ff';
+    ctx.save();
+    if (gGlow){ ctx.shadowColor=pCol; ctx.shadowBlur=9; }
+    ctx.fillStyle = pCol + 'ee';
+    ctx.beginPath(); ctx.arc(px,py,3,0,Math.PI*2); ctx.fill();
+    // tail
+    ctx.globalAlpha=.25;
+    const tx = px-(pb.x-pa.x)*.018, ty = py-(pb.y-pa.y)*.018;
+    ctx.beginPath(); ctx.arc(tx,ty,2,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=.1;
+    const tx2 = px-(pb.x-pa.x)*.032, ty2 = py-(pb.y-pa.y)*.032;
+    ctx.beginPath(); ctx.arc(tx2,ty2,1.3,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+
+  /* Nodes */
+  NODES.forEach(nd => {
+    const {x:nx,y:ny} = proj(nd.x,nd.y,nd.z,W,H);
+    // Smaller nodes on narrow screens so labels have breathing room
+    const r = W < 360 ? Math.max(4, W*.009)
+            : W < 500 ? Math.max(5, W*.010)
+            : Math.max(6, W*.011);
+    ctx.save();
+    if (gGlow){ ctx.shadowColor=nd.col; ctx.shadowBlur=12; }
+    ctx.strokeStyle = nd.col+'99'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(nx,ny,r+2.5,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='rgba(8,24,52,.92)';
+    ctx.beginPath(); ctx.arc(nx,ny,r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=nd.col;
+    ctx.beginPath(); ctx.arc(nx,ny,r*.36,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+    if (gLabels){
+      ctx.save();
+      // Responsive font: smaller on narrow screens, bigger on wide
+      const lblSize = Math.max(6, Math.min(W * 0.012, 13));
+      ctx.font=`${lblSize}px 'Courier New',Consolas,monospace`;
+      ctx.fillStyle=nd.col+'cc'; ctx.textAlign='center';
+      // Offset label below node; tighter gap on small screens
+      const lblY = ny + r + (W < 400 ? 7 : 10);
+      ctx.fillText(nd.lbl, nx, lblY);
+      ctx.restore();
+    }
+  });
+
+  /* Zone headers */
+  if (gLabels && W>280){
+    const zones = [
+      {lbl:'CLIENTE',  xf:.06, col:'#00e5ff'},
+      {lbl:'ISP',      xf:.24, col:'#c471f5'},
+      {lbl:'CDN',      xf:.46, col:'#ff6b35'},
+      {lbl:'CORE',     xf:.62, col:'#f9d71c'},
+      {lbl:'ORIGEN',   xf:.80, col:'#39ff14'},
+    ];
+    const zoneSize = Math.max(7, Math.min(W * 0.011, 13));
+    zones.forEach(({lbl,xf,col}) => {
+      const p = proj(xf,.08,.0,W,H);
+      ctx.save();
+      ctx.font=`700 ${zoneSize}px 'Arial Black','Impact',sans-serif`;
+      ctx.fillStyle=col; ctx.globalAlpha=.65; ctx.textAlign='center';
+      ctx.fillText(lbl, p.x, p.y);
+      ctx.restore();
+    });
+  }
+
+  gAF = requestAnimationFrame(draw);
+};
+
+/* Set throughput bar heights from data-pct — works at any container size */
+const initTpBars = () => {
+  const wrap = document.getElementById('tpChart');
+  if (!wrap) return;
+  const maxH = wrap.offsetHeight || 120;
+  wrap.querySelectorAll('.tp-b').forEach(bar => {
+    const pct = parseFloat(bar.dataset.pct) || 50;
+    bar.style.height = Math.round((pct / 100) * (maxH - 20)) + 'px';
+  });
+};
+
+const initCvs = () => {
+  resizeCvs();
+  cancelAnimationFrame(gAF);
+  draw();
+  setTimeout(initTpBars, 50);
+};
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(initCvs, 80);
+});
+
+/* Start after fonts + layout settle */
+if (document.readyState === 'complete') {
+  setTimeout(initCvs, 100);
+} else {
+  window.addEventListener('load', () => setTimeout(initCvs, 100));
+}
+</script>
+</body>
+</html>
